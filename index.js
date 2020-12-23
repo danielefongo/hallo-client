@@ -23,6 +23,12 @@ class HalloClient {
     this.socket.emit('hallo_left', this.room)
   }
 
+  async changeConstraints(constraints) {
+    this.constraints = constraints
+    await this.loadStream()
+    this.addLocalTracksForAll()
+  }
+
   prepareSocket() {
     this.socket.on('hallo_created', async () => {
       await this.loadStream()
@@ -41,11 +47,12 @@ class HalloClient {
 
     this.socket.on('hallo_new_peer', async (peerId) => {
       this.newPeer(peerId)
-      await this.createOffer(peerId)
     })
 
     this.socket.on('hallo_offer', async (peerId, event) => {
-      this.newPeer(peerId)
+      if(!this.peers[peerId]) {
+        this.newPeer(peerId)
+      }
       this.addRemote(peerId, event)
       await this.createAnswer(peerId)
     })
@@ -70,13 +77,20 @@ class HalloClient {
   }
 
   newPeer(peerId) {
-    this.peers[peerId] = new RTCPeerConnection(this.iceServers)
-    this.addLocalTracks(this.peers[peerId])
-    this.peers[peerId].ontrack = (e) => {
-      this.peers[peerId].stream = e.streams[0]
-      this.callbacks.addRemoteStream(e.streams[0])
+    const peer = new RTCPeerConnection(this.iceServers)
+    this.peers[peerId] = peer
+
+    this.addLocalTracks(peerId)
+
+    peer.ontrack = ({streams}) => {
+      if(peer.stream) {
+        this.callbacks.removeRemoteStream(peer.stream)
+      }
+      peer.stream = streams[0]
+      this.callbacks.addRemoteStream(streams[0])
     }
-    this.peers[peerId].onicecandidate = (e) => this.sendIceCandidate(e, peerId)
+    peer.onicecandidate = (e) => this.sendIceCandidate(e, peerId)
+    peer.onnegotiationneeded = () => this.createOffer(peerId)
   }
 
   addRemote(peerId, event) {
@@ -111,9 +125,13 @@ class HalloClient {
     }
   }
 
-  addLocalTracks(rtcPeerConnection) {
+  addLocalTracksForAll() {
+    Object.keys(this.peers).forEach(this.addLocalTracks.bind(this))
+  }
+
+  addLocalTracks(peerId) {
     this.localStream.getTracks().forEach((track) => {
-      rtcPeerConnection.addTrack(track, this.localStream)
+      this.peers[peerId].addTrack(track, this.localStream)
     })
   }
 }
