@@ -25,5 +25,11 @@ hallo.join("a_room", mediaConstraints, {
 ...
 */
 
+hallo.changeConstraints({...mediaConstraints, audio: false})
+
+/*
+...
+*/
+
 hallo.leave()
 ```
