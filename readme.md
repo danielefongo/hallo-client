@@ -5,17 +5,15 @@ Simple webrtc client for [hallo-server](https://www.npmjs.com/package/hallo-serv
 ## usage
 
 ```javascript
-const mediaConstraints = {
-  audio: true,
-  video: { width: 1280, height: 720 },
-}
-
 const iceServers = {
   iceServers: [{ urls: 'stun:stun.l.google.com:19302'}]
 }
 const hallo = new HalloClient(iceServers)
 
-hallo.join("a_room", mediaConstraints, {
+const showWebcam = () => navigator.mediaDevices.getUserMedia({ audio: false, video: true })
+const showMonitor = () => navigator.mediaDevices.getDisplayMedia({ video: {displaySurface: "monitor"} })
+
+hallo.join("a_room", showWebcam, {
   addLocalStream: (stream) => doStuff(),
   addRemoteStream: (stream) => doStuff(),
   removeRemoteStream: (stream) => doStuff()
@@ -25,7 +23,7 @@ hallo.join("a_room", mediaConstraints, {
 ...
 */
 
-hallo.changeConstraints({...mediaConstraints, audio: false})
+hallo.changeMediaLambda(showMonitor)
 
 /*
 ...

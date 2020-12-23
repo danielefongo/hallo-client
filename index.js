@@ -9,11 +9,11 @@ class HalloClient {
     this.iceServers = iceServers
   }
 
-  join(room, constraints, callbacks) {
+  join(room, mediaLambda, callbacks) {
     if (!room) throw new Error("Invalid room")
 
     this.room = room
-    this.constraints = constraints
+    this.mediaLambda = mediaLambda
     this.callbacks = callbacks
     this.prepareSocket()
     this.socket.emit('hallo_join', room)
@@ -23,8 +23,8 @@ class HalloClient {
     this.socket.emit('hallo_left', this.room)
   }
 
-  async changeConstraints(constraints) {
-    this.constraints = constraints
+  async changeMediaLambda(mediaLambda) {
+    this.mediaLambda = mediaLambda
     await this.loadStream()
     this.addLocalTracksForAll()
   }
@@ -69,7 +69,7 @@ class HalloClient {
 
   async loadStream() {
     try {
-      this.localStream = await navigator.mediaDevices.getUserMedia(this.constraints)
+      this.localStream = await this.mediaLambda()
       this.callbacks.addLocalStream(this.localStream)
     } catch (error) {
       console.error('Could not get user media', error)
