@@ -36,6 +36,7 @@ class HalloClient {
     this.socket.on('hallo_left', async (peerId) => {
       this.callbacks.removeRemoteStream(this.peers[peerId].stream)
       this.peers[peerId].close()
+      delete this.peers[peerId]
     })
 
     this.socket.on('hallo_new_peer', async (peerId) => {
