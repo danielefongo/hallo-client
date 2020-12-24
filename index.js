@@ -87,11 +87,11 @@ class HalloClient {
     this.addLocalTracks(peerId)
 
     peer.ontrack = ({streams}) => {
-      if(peer.stream) {
-        this.callbacks.removeRemoteStream(peer.stream)
+      if(peer.stream !== streams[0]) {
+        peer.stream && this.callbacks.removeRemoteStream(peer.stream)
+        peer.stream = streams[0]
+        this.callbacks.addRemoteStream(streams[0])
       }
-      peer.stream = streams[0]
-      this.callbacks.addRemoteStream(streams[0])
     }
     peer.onicecandidate = (e) => this.sendIceCandidate(e, peerId)
     peer.onnegotiationneeded = () => this.createOffer(peerId)
