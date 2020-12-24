@@ -14,13 +14,17 @@ class HalloClient {
 
     this.room = room
     this.mediaLambda = mediaLambda
-    this.callbacks = callbacks
+    this.changeCallbacks(callbacks)
     this.prepareSocket()
     this.socket.emit('hallo_join', room)
   }
 
   leave() {
     this.socket.emit('hallo_left', this.room)
+  }
+
+  changeCallbacks(callbacks) {
+    this.callbacks = callbacks
   }
 
   async changeMediaLambda(mediaLambda) {
