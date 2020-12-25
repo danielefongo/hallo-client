@@ -30,7 +30,7 @@ class HalloClient {
   async changeMediaLambda(mediaLambda) {
     this.mediaLambda = mediaLambda
     await this.loadStream()
-    this.addLocalTracksForAll()
+    this.replaceLocalTracksForAll()
   }
 
   prepareSocket() {
@@ -73,7 +73,8 @@ class HalloClient {
 
   async loadStream() {
     try {
-      this.localStream = await this.mediaLambda()
+      const stream = await this.mediaLambda()
+      this.setLocalStream(stream)
       this.callbacks.addLocalStream(this.localStream)
     } catch (error) {
       console.error('Could not get user media', error)
@@ -86,13 +87,7 @@ class HalloClient {
 
     this.addLocalTracks(peerId)
 
-    peer.ontrack = ({streams}) => {
-      if(peer.stream !== streams[0]) {
-        peer.stream && this.callbacks.removeRemoteStream(peer.stream)
-        peer.stream = streams[0]
-        this.callbacks.addRemoteStream(streams[0])
-      }
-    }
+    peer.ontrack = ({streams}) => this.setRemoteStream(peerId, streams[0])
     peer.onicecandidate = (e) => this.sendIceCandidate(e, peerId)
     peer.onnegotiationneeded = () => this.createOffer(peerId)
   }
@@ -129,8 +124,16 @@ class HalloClient {
     }
   }
 
-  addLocalTracksForAll() {
-    Object.keys(this.peers).forEach(this.addLocalTracks.bind(this))
+  setLocalStream(stream) {
+    this.localStream = new MediaStream([
+      stream.getVideoTracks()[0] || black(),
+      stream.getAudioTracks()[0] || silence()
+    ])
+  }
+
+  setRemoteStream(peerId, stream) {
+    this.peers[peerId].stream = stream
+    this.callbacks.addRemoteStream(stream)
   }
 
   addLocalTracks(peerId) {
@@ -138,6 +141,34 @@ class HalloClient {
       this.peers[peerId].addTrack(track, this.localStream)
     })
   }
+
+  replaceLocalTracksForAll() {
+    Object.values(this.peers).forEach(peer => {
+      peer.getSenders().forEach(sender => {
+        const track = this.localStream.getTracks().find(it => it.kind == sender.track.kind)
+        sender.replaceTrack(track)
+      })
+    })
+  }
+}
+
+const silence = () => {
+  const context = new AudioContext()
+  const oscillator = context.createOscillator()
+  const stream = oscillator.connect(context.createMediaStreamDestination()).stream
+
+  oscillator.start()
+
+  return Object.assign(stream.getAudioTracks()[0], {enabled: false});
+}
+
+const black = ({width = 480, height = 270} = {}) => {
+  const canvas = Object.assign(document.createElement("canvas"), {width, height});
+  canvas.getContext('2d').fillRect(0, 0, width, height);
+
+  const stream = canvas.captureStream()
+
+  return Object.assign(stream.getVideoTracks()[0], {enabled: false});
 }
 
 export default HalloClient
