@@ -26,7 +26,11 @@ hallo.join("a_room", showWebcam, {
 hallo.changeMediaLambda(showMonitor)
 
 // Update callbacks (useful in scenarios like React hooks)
-hallo.changeCallbacks()
+hallo.changeCallbacks({
+  addLocalStream: (stream) => doStuff(),
+  addRemoteStream: (stream) => doStuff(),
+  removeRemoteStream: (stream) => doStuff()
+})
 
 // Leave room
 hallo.leave()

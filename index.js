@@ -74,6 +74,7 @@ class HalloClient {
   async loadStream() {
     try {
       const stream = await this.mediaLambda()
+      this.stopLocalTracks()
       this.setLocalStream(stream)
       this.callbacks.addLocalStream(this.localStream)
     } catch (error) {
@@ -97,25 +98,17 @@ class HalloClient {
   }
 
   async createOffer(peerId) {
-    try {
-      const sdp = await this.peers[peerId].createOffer()
-      this.peers[peerId].setLocalDescription(sdp)
+    const sdp = await this.peers[peerId].createOffer()
+    this.peers[peerId].setLocalDescription(sdp)
 
-      this.socket.emit('hallo_offer', {sdp, peerId})
-    } catch (error) {
-      console.error(error)
-    }
+    this.socket.emit('hallo_offer', {sdp, peerId})
   }
 
   async createAnswer(peerId) {
-    try {
-      const sdp = await this.peers[peerId].createAnswer()
-      this.peers[peerId].setLocalDescription(sdp)
+    const sdp = await this.peers[peerId].createAnswer()
+    this.peers[peerId].setLocalDescription(sdp)
 
-      this.socket.emit('hallo_answer', {sdp, peerId})
-    } catch (error) {
-      console.error(error)
-    }
+    this.socket.emit('hallo_answer', {sdp, peerId})
   }
 
   sendIceCandidate(event, peerId) {
@@ -140,6 +133,12 @@ class HalloClient {
     this.localStream.getTracks().forEach((track) => {
       this.peers[peerId].addTrack(track, this.localStream)
     })
+  }
+
+  stopLocalTracks() {
+    if(this.localStream) {
+      this.localStream.getTracks().forEach(track => track.stop())
+    }
   }
 
   replaceLocalTracksForAll() {
