@@ -85,10 +85,11 @@ class HalloClient {
   newPeer(peerId) {
     const peer = new RTCPeerConnection(this.iceServers)
     this.peers[peerId] = peer
+    this.peers[peerId].stream = new MediaStream([])
 
     this.addLocalTracks(peerId)
 
-    peer.ontrack = ({streams}) => this.setRemoteStream(peerId, streams[0])
+    peer.ontrack = ({transceiver}) => this.addRemoteTrack(peerId, transceiver.receiver.track)
     peer.onicecandidate = (e) => this.sendIceCandidate(e, peerId)
     peer.onnegotiationneeded = () => this.createOffer(peerId)
   }
@@ -124,30 +125,33 @@ class HalloClient {
     ])
   }
 
-  setRemoteStream(peerId, stream) {
-    this.peers[peerId].stream = stream
-    this.callbacks.addRemoteStream(stream)
+  addRemoteTrack(peerId, track) {
+    this.peers[peerId].stream.addTrack(track)
+    this.callbacks.addRemoteStream(this.peers[peerId].stream)
   }
 
   addLocalTracks(peerId) {
-    this.localStream.getTracks().forEach((track) => {
-      this.peers[peerId].addTrack(track, this.localStream)
-    })
+    this.localStream.getTracks().forEach((track) => this.peers[peerId].addTransceiver(track))
   }
 
-  stopLocalTracks() {
-    if(this.localStream) {
-      this.localStream.getTracks().forEach(track => track.stop())
-    }
+  replaceLocalTracks(peerId) {
+    this.peers[peerId]
+      .getTransceivers()
+      .filter(it => it.currentDirection === 'sendonly')
+      .forEach(transceiver => {
+        this.localStream
+          .getTracks()
+          .filter(track => track.kind === transceiver.sender.track.kind)
+          .forEach(track => transceiver.sender.replaceTrack(track))
+      })
   }
 
   replaceLocalTracksForAll() {
-    Object.values(this.peers).forEach(peer => {
-      peer.getSenders().forEach(sender => {
-        const track = this.localStream.getTracks().find(it => it.kind == sender.track.kind)
-        sender.replaceTrack(track)
-      })
-    })
+    Object.keys(this.peers).forEach(this.replaceLocalTracks.bind(this))
+  }
+
+  stopLocalTracks() {
+    if(this.localStream) this.localStream.getTracks().forEach(track => track.stop())
   }
 }
 
