@@ -117,7 +117,6 @@ class HalloClient {
   }
 
   async createAnswer(peer) {
-    console.log("ans", peer)
     const sdp = await peer.createAnswer()
     peer.setLocalDescription(sdp)
 
