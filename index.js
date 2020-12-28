@@ -30,7 +30,7 @@ class HalloClient {
   async changeMediaLambda(mediaLambda) {
     this.mediaLambda = mediaLambda
     await this.loadStream()
-    this.replaceLocalTracksForAll()
+    this.setLocalTracksForAll()
   }
 
   prepareSocket() {
@@ -44,7 +44,7 @@ class HalloClient {
     })
 
     this.socket.on('hallo_left', async (peerId) => {
-      this.callbacks.removeRemoteStream(this.peers[peerId].stream)
+      this.peers[peerId].stream.getTracks().forEach(this.callbacks.removeRemoteTrack)
       this.peers[peerId].close()
       delete this.peers[peerId]
     })
@@ -74,9 +74,15 @@ class HalloClient {
   async loadStream() {
     try {
       const stream = await this.mediaLambda()
-      this.stopLocalTracks()
-      this.setLocalStream(stream)
-      this.callbacks.addLocalStream(this.localStream)
+      if(this.localStream) {
+        this.localStream.getTracks().forEach(track => {
+          track.enabled = false
+          track.stop()
+          this.callbacks.removeLocalTrack(track)
+        })
+      }
+      this.localStream = stream
+      this.localStream.getTracks().forEach(this.callbacks.addLocalTrack)
     } catch (error) {
       console.error('Could not get user media', error)
     }
@@ -87,7 +93,7 @@ class HalloClient {
     this.peers[peerId] = peer
     this.peers[peerId].stream = new MediaStream([])
 
-    this.addLocalTracks(peerId)
+    this.setLocalTracks(peerId)
 
     peer.ontrack = ({transceiver}) => this.addRemoteTrack(peerId, transceiver.receiver.track)
     peer.onicecandidate = (e) => this.sendIceCandidate(e, peerId)
@@ -118,60 +124,61 @@ class HalloClient {
     }
   }
 
-  setLocalStream(stream) {
-    this.localStream = new MediaStream([
-      stream.getVideoTracks()[0] || black(),
-      stream.getAudioTracks()[0] || silence()
-    ])
-  }
-
   addRemoteTrack(peerId, track) {
-    this.peers[peerId].stream.addTrack(track)
-    this.callbacks.addRemoteStream(this.peers[peerId].stream)
+    track.onmute = () => {
+      this.peers[peerId].stream.removeTrack(track)
+      this.callbacks.removeRemoteTrack(track)
+    }
+    track.onunmute = () => {
+      this.peers[peerId].stream.addTrack(track)
+      this.callbacks.addRemoteTrack(track)
+    }
   }
 
-  addLocalTracks(peerId) {
-    this.localStream.getTracks().forEach((track) => this.peers[peerId].addTransceiver(track))
+  setLocalTracksForAll() {
+    Object.keys(this.peers).forEach(this.setLocalTracks.bind(this))
   }
 
-  replaceLocalTracks(peerId) {
-    this.peers[peerId]
+  setLocalTracks(peerId) {
+    this.outputTransceivers(peerId).forEach(transceiver => {
+      const track = this.localStream.getTracks().find(it => it.kind === transceiver.sender.track.kind)
+      if(!track) {
+        transceiver.sender.replaceTrack(null)
+        transceiver.direction = 'inactive'
+      }
+    })
+
+    this.localStream.getTracks().forEach((track) => {
+      const transceiver = this.outputTransceivers(peerId).find(it => it.sender.track.kind === track.kind)
+      if (transceiver) {
+        transceiver.sender.replaceTrack(track)
+        return
+      }
+
+      const inactiveTransceiver = this.firstInactiveTransceiver(peerId)
+      if(inactiveTransceiver) {
+        inactiveTransceiver.sender.replaceTrack(track)
+        inactiveTransceiver.direction = 'sendrecv'
+        return
+      }
+
+      this.peers[peerId].addTransceiver(track)
+    })
+  }
+
+  outputTransceivers(peerId) {
+    return this.peers[peerId]
       .getTransceivers()
       .filter(it => it.currentDirection === 'sendonly')
-      .forEach(transceiver => {
-        this.localStream
-          .getTracks()
-          .filter(track => track.kind === transceiver.sender.track.kind)
-          .forEach(track => transceiver.sender.replaceTrack(track))
-      })
+      .filter(it => it.sender.track)
   }
 
-  replaceLocalTracksForAll() {
-    Object.keys(this.peers).forEach(this.replaceLocalTracks.bind(this))
+  firstInactiveTransceiver(peerId) {
+    return this.peers[peerId]
+      .getTransceivers()
+      .filter(it => it.direction === 'inactive')
+      .find(it => !it.sender.track)
   }
-
-  stopLocalTracks() {
-    if(this.localStream) this.localStream.getTracks().forEach(track => track.stop())
-  }
-}
-
-const silence = () => {
-  const context = new AudioContext()
-  const oscillator = context.createOscillator()
-  const stream = oscillator.connect(context.createMediaStreamDestination()).stream
-
-  oscillator.start()
-
-  return Object.assign(stream.getAudioTracks()[0], {enabled: false});
-}
-
-const black = ({width = 480, height = 270} = {}) => {
-  const canvas = Object.assign(document.createElement("canvas"), {width, height});
-  canvas.getContext('2d').fillRect(0, 0, width, height);
-
-  const stream = canvas.captureStream()
-
-  return Object.assign(stream.getVideoTracks()[0], {enabled: false});
 }
 
 export default HalloClient
