@@ -1,29 +1,26 @@
 import io from "socket.io-client";
+import EventEmitter from "events";
 
-class HalloClient {
+class HalloClient extends EventEmitter {
   constructor(iceServers) {
+    super()
     this.peers = {}
     this.iceServers = iceServers
   }
 
-  join(username, room, mediaLambda, callbacks) {
+  join(username, room, mediaLambda) {
     if (!room) throw new Error("Invalid room")
 
     this.socket = io()
     this.username = username
     this.room = room
     this.mediaLambda = mediaLambda
-    this.changeCallbacks(callbacks)
     this.prepareSocket()
     this.socket.emit('hallo_join', username, room)
   }
 
   leave() {
     this.socket.emit('hallo_left')
-  }
-
-  changeCallbacks(callbacks) {
-    this.callbacks = callbacks
   }
 
   async changeMediaLambda(mediaLambda) {
@@ -33,25 +30,33 @@ class HalloClient {
   }
 
   prepareSocket() {
-    this.socket.on('hallo_created', async () => {
+    this.socket.on('hallo_created', async (data) => {
       await this.loadStream()
+      this.emit('joined', data)
     })
 
-    this.socket.on('hallo_joined', async () => {
+    this.socket.on('hallo_joined', async (data) => {
       await this.loadStream()
+      this.emit('joined', data)
       this.socket.emit('hallo_new_peer')
     })
 
     this.socket.on('hallo_already_joined', (data) => {
-      this.callbacks.alreadyJoined(data)
+      this.emit('already_joined', data)
     })
 
-    this.socket.on('hallo_left', ({id}) => {
+    this.socket.on('hallo_left', (data) => {
+      this.emit('left', data)
+
+      const {id} = data
       this.peers[id].close()
       delete this.peers[id]
     })
 
-    this.socket.on('hallo_new_peer', ({id, username}) => {
+    this.socket.on('hallo_new_peer', (data) => {
+      this.emit('joined', data)
+
+      const {id, username} = data
       this.newPeer(id, username)
     })
 
@@ -79,11 +84,11 @@ class HalloClient {
         this.localStream.getTracks().forEach(track => {
           track.enabled = false
           track.stop()
-          this.callbacks.removeLocalTrack(this.username, track)
+          this.emit('remove_local_track', {username: this.username, track})
         })
       }
       this.localStream = stream
-      this.localStream.getTracks().forEach(track => this.callbacks.addLocalTrack(this.username, track))
+      this.localStream.getTracks().forEach(track => this.emit('add_local_track', {username: this.username, track}))
     } catch (error) {
       console.error('Could not get user media', error)
     }
@@ -131,11 +136,11 @@ class HalloClient {
   addRemoteTrack(peer, track) {
     track.onmute = () => {
       peer.stream.removeTrack(track)
-      this.callbacks.removeRemoteTrack(peer.username, track)
+      this.emit('remove_remote_track', {username: peer.username, track})
     }
     track.onunmute = () => {
       peer.stream.addTrack(track)
-      this.callbacks.addRemoteTrack(peer.username, track)
+      this.emit('add_remote_track', {username: peer.username, track})
     }
   }
 

@@ -15,26 +15,22 @@ const showMonitor = () => navigator.mediaDevices.getDisplayMedia({ video: {displ
 // Create new client
 const hallo = new HalloClient(iceServers)
 
+// Prepare event handlers
+hallo.on('joined', ({username, room, id}) => doStuff())
+hallo.on('left', ({username, room, id}) => doStuff())
+hallo.on('already_joined', ({username, room, id}) => doStuff())
+
+hallo.on('add_remote_track', ({username, track}) => doStuff())
+hallo.on('remove_remote_track', ({username, track}) => doStuff())
+
+hallo.on('add_local_track', ({username, track}) => doStuff())
+hallo.on('remove_local_track', ({username, track}) => doStuff())
+
 // Join room
-hallo.join("username", "a_room", showWebcam, {
-  addLocalTrack: (track) => doStuff(),
-  removeLocalTrack: (track) => doStuff(),
-  addRemoteTrack: (track) => doStuff(),
-  removeRemoteTrack: (track) => doStuff(),
-  alreadyJoined: (response) => doStuff()
-})
+hallo.join("username", "a_room", showWebcam)
 
 // Update stream by using new UserMedia
 hallo.changeMediaLambda(showMonitor)
-
-// Update callbacks (useful in scenarios like React hooks)
-hallo.changeCallbacks({
-  addLocalTrack: (track) => doStuff(),
-  removeLocalTrack: (track) => doStuff(),
-  addRemoteTrack: (track) => doStuff(),
-  removeRemoteTrack: (track) => doStuff(),
-  alreadyJoined: (response) => doStuff()
-})
 
 // Leave room
 hallo.leave()
