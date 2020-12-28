@@ -44,7 +44,6 @@ class HalloClient {
 
     this.socket.on('hallo_already_joined', (data) => {
       this.callbacks.alreadyJoined(data)
-      this.socket.close()
     })
 
     this.socket.on('hallo_left', ({id}) => {

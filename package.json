@@ -1,6 +1,6 @@
 {
   "name": "hallo-client",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Client for hallo",
   "main": "index.js",
   "scripts": {
