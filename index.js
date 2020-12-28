@@ -44,7 +44,6 @@ class HalloClient {
     })
 
     this.socket.on('hallo_left', async (peerId) => {
-      this.peers[peerId].stream.getTracks().forEach(this.callbacks.removeRemoteTrack)
       this.peers[peerId].close()
       delete this.peers[peerId]
     })
