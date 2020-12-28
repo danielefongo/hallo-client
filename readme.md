@@ -16,11 +16,12 @@ const showMonitor = () => navigator.mediaDevices.getDisplayMedia({ video: {displ
 const hallo = new HalloClient(iceServers)
 
 // Join room
-hallo.join("a_room", showWebcam, {
+hallo.join("username", "a_room", showWebcam, {
   addLocalTrack: (track) => doStuff(),
   removeLocalTrack: (track) => doStuff(),
   addRemoteTrack: (track) => doStuff(),
-  removeRemoteTrack: (track) => doStuff()
+  removeRemoteTrack: (track) => doStuff(),
+  alreadyJoined: (response) => doStuff()
 })
 
 // Update stream by using new UserMedia
@@ -31,7 +32,8 @@ hallo.changeCallbacks({
   addLocalTrack: (track) => doStuff(),
   removeLocalTrack: (track) => doStuff(),
   addRemoteTrack: (track) => doStuff(),
-  removeRemoteTrack: (track) => doStuff()
+  removeRemoteTrack: (track) => doStuff(),
+  alreadyJoined: (response) => doStuff()
 })
 
 // Leave room

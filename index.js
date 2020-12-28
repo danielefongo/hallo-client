@@ -2,25 +2,24 @@ import io from "socket.io-client";
 
 class HalloClient {
   constructor(iceServers) {
-    this.socket = io()
     this.peers = {}
-    this.room = undefined
-    this.localStream = undefined
     this.iceServers = iceServers
   }
 
-  join(room, mediaLambda, callbacks) {
+  join(username, room, mediaLambda, callbacks) {
     if (!room) throw new Error("Invalid room")
 
+    this.socket = io()
+    this.username = username
     this.room = room
     this.mediaLambda = mediaLambda
     this.changeCallbacks(callbacks)
     this.prepareSocket()
-    this.socket.emit('hallo_join', room)
+    this.socket.emit('hallo_join', username, room)
   }
 
   leave() {
-    this.socket.emit('hallo_left', this.room)
+    this.socket.emit('hallo_left')
   }
 
   changeCallbacks(callbacks) {
@@ -40,33 +39,37 @@ class HalloClient {
 
     this.socket.on('hallo_joined', async () => {
       await this.loadStream()
-      this.socket.emit('hallo_new_peer', this.room)
+      this.socket.emit('hallo_new_peer')
     })
 
-    this.socket.on('hallo_left', async (peerId) => {
-      this.peers[peerId].close()
-      delete this.peers[peerId]
+    this.socket.on('hallo_already_joined', (data) => {
+      this.callbacks.alreadyJoined(data)
+      this.socket.close()
     })
 
-    this.socket.on('hallo_new_peer', async (peerId) => {
-      this.newPeer(peerId)
+    this.socket.on('hallo_left', ({id}) => {
+      this.peers[id].close()
+      delete this.peers[id]
     })
 
-    this.socket.on('hallo_offer', async (peerId, event) => {
-      if(!this.peers[peerId]) {
-        this.newPeer(peerId)
+    this.socket.on('hallo_new_peer', ({id, username}) => {
+      this.newPeer(id, username)
+    })
+
+    this.socket.on('hallo_offer', async ({id, username}, {sdp}) => {
+      if(!this.peers[id]) {
+        this.newPeer(id, username)
       }
-      this.addRemote(peerId, event)
-      await this.createAnswer(peerId)
+      this.addRemote(id, sdp)
+      await this.createAnswer(id)
     })
 
-    this.socket.on('hallo_answer', (peerId, event) => {
-      this.addRemote(peerId, event)
+    this.socket.on('hallo_answer', ({id}, {sdp}) => {
+      this.addRemote(id, sdp)
     })
 
-    this.socket.on('hallo_candidate', (peerId, event) => {
-      var candidate = new RTCIceCandidate(event.candidate)
-      this.peers[peerId].addIceCandidate(candidate)
+    this.socket.on('hallo_candidate', ({id}, {candidate}) => {
+      this.peers[id].addIceCandidate(new RTCIceCandidate(candidate))
     })
   }
 
@@ -77,19 +80,20 @@ class HalloClient {
         this.localStream.getTracks().forEach(track => {
           track.enabled = false
           track.stop()
-          this.callbacks.removeLocalTrack(track)
+          this.callbacks.removeLocalTrack(this.username, track)
         })
       }
       this.localStream = stream
-      this.localStream.getTracks().forEach(this.callbacks.addLocalTrack)
+      this.localStream.getTracks().forEach(track => this.callbacks.addLocalTrack(this.username, track))
     } catch (error) {
       console.error('Could not get user media', error)
     }
   }
 
-  newPeer(peerId) {
+  newPeer(peerId, username) {
     const peer = new RTCPeerConnection(this.iceServers)
     this.peers[peerId] = peer
+    this.peers[peerId].username = username
     this.peers[peerId].stream = new MediaStream([])
 
     this.setLocalTracks(peerId)
@@ -126,11 +130,11 @@ class HalloClient {
   addRemoteTrack(peerId, track) {
     track.onmute = () => {
       this.peers[peerId].stream.removeTrack(track)
-      this.callbacks.removeRemoteTrack(track)
+      this.callbacks.removeRemoteTrack(this.peers[peerId].username, track)
     }
     track.onunmute = () => {
       this.peers[peerId].stream.addTrack(track)
-      this.callbacks.addRemoteTrack(track)
+      this.callbacks.addRemoteTrack(this.peers[peerId].username, track)
     }
   }
 
