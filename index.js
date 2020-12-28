@@ -60,12 +60,12 @@ class HalloClient {
       if(!this.peers[id]) {
         this.newPeer(id, username)
       }
-      this.addRemote(id, sdp)
-      await this.createAnswer(id)
+      this.addRemote(this.peers[id], sdp)
+      await this.createAnswer(this.peers[id])
     })
 
     this.socket.on('hallo_answer', ({id}, {sdp}) => {
-      this.addRemote(id, sdp)
+      this.addRemote(this.peers[id], sdp)
     })
 
     this.socket.on('hallo_candidate', ({id}, {candidate}) => {
@@ -92,58 +92,61 @@ class HalloClient {
 
   newPeer(peerId, username) {
     const peer = new RTCPeerConnection(this.iceServers)
+    peer.id = peerId
+    peer.username = username
+    peer.stream = new MediaStream([])
+
     this.peers[peerId] = peer
-    this.peers[peerId].username = username
-    this.peers[peerId].stream = new MediaStream([])
 
-    this.setLocalTracks(peerId)
+    this.setLocalTracks(peer)
 
-    peer.ontrack = ({transceiver}) => this.addRemoteTrack(peerId, transceiver.receiver.track)
-    peer.onicecandidate = (e) => this.sendIceCandidate(e, peerId)
-    peer.onnegotiationneeded = () => this.createOffer(peerId)
+    peer.ontrack = ({transceiver}) => this.addRemoteTrack(peer, transceiver.receiver.track)
+    peer.onicecandidate = (e) => this.sendIceCandidate(e, peer)
+    peer.onnegotiationneeded = () => this.createOffer(peer)
   }
 
-  addRemote(peerId, event) {
-    this.peers[peerId].setRemoteDescription(new RTCSessionDescription(event))
+  addRemote(peer, event) {
+    peer.setRemoteDescription(new RTCSessionDescription(event))
   }
 
-  async createOffer(peerId) {
-    const sdp = await this.peers[peerId].createOffer()
-    this.peers[peerId].setLocalDescription(sdp)
+  async createOffer(peer) {
+    const sdp = await peer.createOffer()
+    peer.setLocalDescription(sdp)
 
-    this.socket.emit('hallo_offer', {sdp, peerId})
+    this.socket.emit('hallo_offer', {sdp, peerId: peer.id})
   }
 
-  async createAnswer(peerId) {
-    const sdp = await this.peers[peerId].createAnswer()
-    this.peers[peerId].setLocalDescription(sdp)
+  async createAnswer(peer) {
+    console.log("ans", peer)
+    const sdp = await peer.createAnswer()
+    peer.setLocalDescription(sdp)
 
-    this.socket.emit('hallo_answer', {sdp, peerId})
+    this.socket.emit('hallo_answer', {sdp, peerId: peer.id})
   }
 
-  sendIceCandidate(event, peerId) {
+  sendIceCandidate(event, peer) {
     if (event.candidate) {
-      this.socket.emit('hallo_candidate', {candidate: event.candidate, peerId})
+      this.socket.emit('hallo_candidate', {candidate: event.candidate, peerId: peer.id})
     }
   }
 
-  addRemoteTrack(peerId, track) {
+  addRemoteTrack(peer, track) {
     track.onmute = () => {
-      this.peers[peerId].stream.removeTrack(track)
-      this.callbacks.removeRemoteTrack(this.peers[peerId].username, track)
+      peer.stream.removeTrack(track)
+      this.callbacks.removeRemoteTrack(peer.username, track)
     }
     track.onunmute = () => {
-      this.peers[peerId].stream.addTrack(track)
-      this.callbacks.addRemoteTrack(this.peers[peerId].username, track)
+      peer.stream.addTrack(track)
+      this.callbacks.addRemoteTrack(peer.username, track)
     }
   }
 
   setLocalTracksForAll() {
-    Object.keys(this.peers).forEach(this.setLocalTracks.bind(this))
+    Object.values(this.peers).forEach(this.setLocalTracks.bind(this))
   }
 
-  setLocalTracks(peerId) {
-    this.outputTransceivers(peerId).forEach(transceiver => {
+  setLocalTracks(peer) {
+    this.outputTransceivers(peer).forEach(transceiver => {
       const track = this.localStream.getTracks().find(it => it.kind === transceiver.sender.track.kind)
       if(!track) {
         transceiver.sender.replaceTrack(null)
@@ -152,32 +155,32 @@ class HalloClient {
     })
 
     this.localStream.getTracks().forEach((track) => {
-      const transceiver = this.outputTransceivers(peerId).find(it => it.sender.track.kind === track.kind)
+      const transceiver = this.outputTransceivers(peer).find(it => it.sender.track.kind === track.kind)
       if (transceiver) {
         transceiver.sender.replaceTrack(track)
         return
       }
 
-      const inactiveTransceiver = this.firstInactiveTransceiver(peerId)
+      const inactiveTransceiver = this.firstInactiveTransceiver(peer)
       if(inactiveTransceiver) {
         inactiveTransceiver.sender.replaceTrack(track)
         inactiveTransceiver.direction = 'sendrecv'
         return
       }
 
-      this.peers[peerId].addTransceiver(track)
+      peer.addTransceiver(track)
     })
   }
 
-  outputTransceivers(peerId) {
-    return this.peers[peerId]
+  outputTransceivers(peer) {
+    return peer
       .getTransceivers()
       .filter(it => it.currentDirection === 'sendonly')
       .filter(it => it.sender.track)
   }
 
-  firstInactiveTransceiver(peerId) {
-    return this.peers[peerId]
+  firstInactiveTransceiver(peer) {
+    return peer
       .getTransceivers()
       .filter(it => it.direction === 'inactive')
       .find(it => !it.sender.track)
