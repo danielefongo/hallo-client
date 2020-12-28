@@ -17,9 +17,10 @@ const hallo = new HalloClient(iceServers)
 
 // Join room
 hallo.join("a_room", showWebcam, {
-  addLocalStream: (stream) => doStuff(),
-  addRemoteStream: (stream) => doStuff(),
-  removeRemoteStream: (stream) => doStuff()
+  addLocalTrack: (track) => doStuff(),
+  removeLocalTrack: (track) => doStuff(),
+  addRemoteTrack: (track) => doStuff(),
+  removeRemoteTrack: (track) => doStuff()
 })
 
 // Update stream by using new UserMedia
@@ -27,9 +28,10 @@ hallo.changeMediaLambda(showMonitor)
 
 // Update callbacks (useful in scenarios like React hooks)
 hallo.changeCallbacks({
-  addLocalStream: (stream) => doStuff(),
-  addRemoteStream: (stream) => doStuff(),
-  removeRemoteStream: (stream) => doStuff()
+  addLocalTrack: (track) => doStuff(),
+  removeLocalTrack: (track) => doStuff(),
+  addRemoteTrack: (track) => doStuff(),
+  removeRemoteTrack: (track) => doStuff()
 })
 
 // Leave room
