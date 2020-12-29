@@ -21,6 +21,7 @@ class HalloClient extends EventEmitter {
 
   leave() {
     this.socket.emit('hallo_left')
+    this.emit('left', this.description)
   }
 
   async changeMediaLambda(mediaLambda) {
@@ -37,6 +38,7 @@ class HalloClient extends EventEmitter {
 
     this.socket.on('hallo_joined', async (data) => {
       await this.loadStream()
+      this.description = data
       this.emit('joined', data)
       this.socket.emit('hallo_new_peer')
     })
