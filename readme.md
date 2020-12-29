@@ -26,6 +26,8 @@ hallo.on('remove_remote_track', ({username, track}) => doStuff())
 hallo.on('add_local_track', ({username, track}) => doStuff())
 hallo.on('remove_local_track', ({username, track}) => doStuff())
 
+hallo.on('message', (message) => doStuff())
+
 // Join room
 hallo.join("username", "a_room", showWebcam)
 
