@@ -29,6 +29,9 @@ hallo.on('remove_local_track', ({username, track}) => doStuff())
 // Join room
 hallo.join("username", "a_room", showWebcam)
 
+// Send message
+hallo.send("another_username", {message: "hallo!"})
+
 // Leave room
 hallo.leave()
 ```

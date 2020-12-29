@@ -19,6 +19,11 @@ class HalloClient extends EventEmitter {
     this.socket.emit('hallo_join', username, room)
   }
 
+  send(username, message) {
+    const peer = Object.values(this.peers).find(it => it.username === username)
+    peer && peer.channel.send(JSON.stringify(message))
+  }
+
   leave() {
     this.socket.emit('hallo_left')
     this.emit('left', this.description)
@@ -51,6 +56,7 @@ class HalloClient extends EventEmitter {
       this.emit('left', data)
 
       const {id} = data
+      this.peers[id].channel.close()
       this.peers[id].close()
       delete this.peers[id]
     })
@@ -101,14 +107,22 @@ class HalloClient extends EventEmitter {
     peer.id = peerId
     peer.username = username
     peer.stream = new MediaStream([])
+    peer.channel = peer.createDataChannel("default")
 
     this.peers[peerId] = peer
 
     this.setLocalTracks(peer)
 
+    peer.ondatachannel = ({channel}) => this.createDataChannel(channel)
     peer.ontrack = ({transceiver}) => this.addRemoteTrack(peer, transceiver.receiver.track)
     peer.onicecandidate = (e) => this.sendIceCandidate(e, peer)
     peer.onnegotiationneeded = () => this.createOffer(peer)
+  }
+
+  createDataChannel(channel) {
+    const hallo = this
+    channel.onmessage = ({data}) => hallo.emit('message', JSON.parse(data))
+    channel.onclosing = () => channel.close()
   }
 
   addRemote(peer, event) {
