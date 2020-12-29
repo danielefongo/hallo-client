@@ -29,9 +29,6 @@ hallo.on('remove_local_track', ({username, track}) => doStuff())
 // Join room
 hallo.join("username", "a_room", showWebcam)
 
-// Update stream by using new UserMedia
-hallo.changeMediaLambda(showMonitor)
-
 // Leave room
 hallo.leave()
 ```
