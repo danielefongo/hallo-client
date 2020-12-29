@@ -34,6 +34,9 @@ hallo.join("username", "a_room", showWebcam)
 // Send message
 hallo.send("another_username", {message: "hallo!"})
 
+// Update stream by using new UserMedia
+hallo.changeMediaLambda(showMonitor)
+
 // Leave room
 hallo.leave()
 ```
