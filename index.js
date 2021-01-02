@@ -38,6 +38,7 @@ class HalloClient extends EventEmitter {
   prepareSocket() {
     this.socket.on('hallo_created', async (data) => {
       await this.loadStream()
+      this.description = data
       this.emit('joined', data)
     })
 
